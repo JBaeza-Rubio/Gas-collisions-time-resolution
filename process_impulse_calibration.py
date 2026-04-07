@@ -4,6 +4,9 @@ import h5py
 
 import analysis_utils as utils
 
+
+import importlib
+importlib.reload(utils)
 # ---------------------------------------------------------------------------
 # Configuration — edit these before running
 # ---------------------------------------------------------------------------
@@ -66,6 +69,7 @@ fit_window_length      = 2**19   # Window length to fit for frequencies
 analysis_window_length = 2**18   # Length of analysis window in number of indices
 search_window_length   = 2**8
 
+
 # ---------------------------------------------------------------------------
 # Helper functions
 # ---------------------------------------------------------------------------
@@ -76,6 +80,8 @@ def get_pulse_shape(zz_bp_in_window, f_lp, amp, length=1500, is_scaled=False):
     else:
         f_lp_scaled = f_lp
     pulse_idx_in_win = np.argmin(np.abs(np.abs(f_lp_scaled) - amp))
+    ### pulse_idx_in_win finds where in the waveform the reconstructed pulse 
+    #### reaches the ampltiude defined as amp. Gives me the per-pulse peak index
 
     if f_lp_scaled[pulse_idx_in_win] > 0:
         polarity = 1
@@ -128,7 +134,8 @@ if __name__ == '__main__':
                 combined_path = os.path.join(data_folder, f'{data_prefix}{v}v*.hdf5')
                 data_files    = sorted(glob.glob(combined_path))
 
-                zz_pulses, pulse_shapes, amps, pulse_indices_in_win = [], [], [], []
+                zz_pulses, pulse_shapes, amps, pulse_indices_in_win = [], [], [], [] 
+                peak_indices_in_win, peak_times_from_trigger_us = [], [] ###new line to tell me where peak occurs & how long after the trigger it occurs & make a list of said things
                 fs_res, drive_areas, noise_levels = [], [], []
                 sv_imps, voigt_params, sv_zs = [], [], []
                 ffz_saved = None
@@ -183,10 +190,12 @@ if __name__ == '__main__':
                     pulse_indices = utils.get_pulse_idx(dd, trigger_level, positive_pulse)
 
                     for pulse_idx in pulse_indices:
-                        window, _, f_lp, amp = utils.recon_pulse(
+                        ####window, _, f_lp, amp = utils.recon_pulse(
+                        window, _, f_lp, amp, peak_idx_in_window, peak_time_from_trigger_us = utils.recon_pulse(
                             pulse_idx, dtt, zz_bp, dd, c_imp, gamma_damping,
                             analysis_window_length, fit_window_length,
                             search_window_length, 20, bandpass_ub, lowpass_order)
+            
                         if window is None:
                             continue
 
@@ -196,7 +205,8 @@ if __name__ == '__main__':
                         # then set ``is_scaled`` to True
                         zz_pulse, pulse_shape, pulse_idx_in_win = get_pulse_shape(
                             zz_bp[window], f_lp, amp, 1500, is_scaled=True)
-
+    ##### this function finds the sample where the pulse reaches the chosen amplitude n cuts out a 
+    ####3k sample waveform centered on that peak
                         if pulse_shape.size != 3000:
                             print('Skipping pulse near the end of file')
                             continue
@@ -208,9 +218,12 @@ if __name__ == '__main__':
                         noise_level = np.std(f_lp[_lb:_ub])
 
                         zz_pulses.append(zz_pulse)
-                        pulse_shapes.append(pulse_shape)
-                        amps.append(amp)
+                        pulse_shapes.append(pulse_shape) ###stores each pulse as a row/array
+                        amps.append(amp) ####this is where the per-pulse impulses are collected
                         pulse_indices_in_win.append(pulse_idx_in_win)
+                        peak_indices_in_win.append(peak_idx_in_window) ###new
+                        peak_times_from_trigger_us.append(peak_time_from_trigger_us)## new line to save timing info into pulse loop
+
                         drive_areas.append(drive_area)
                         fs_res.append(f_res)
                         noise_levels.append(noise_level)
@@ -218,7 +231,8 @@ if __name__ == '__main__':
                     if v == 2.5:
                         noise_indices = np.ceil(0.5 * (pulse_indices[:-1] + pulse_indices[1:])).astype(np.int64)
                         for noise_idx in noise_indices:
-                            window, _, f_lp, amp = utils.recon_pulse(
+                            ###window, _, f_lp, amp = utils.recon_pulse(
+                            window, _, f_lp, amp, _, _ = utils.recon_pulse( ###i redefined recon_pulse to have 6 entries instead of 4, but for this operation, i dont need the 2 new entries, so im just ganna ignore it with _
                                 noise_idx, dtt, zz_bp, dd, c_imp, gamma_damping,
                                 analysis_window_length, fit_window_length,
                                 search_window_length, 20, bandpass_ub, lowpass_order)
@@ -254,6 +268,11 @@ if __name__ == '__main__':
                 g.create_dataset(f'amplitudes_{v}v',          data=np.asarray(amps),                dtype=np.float64)
                 g.create_dataset(f'pulse_shapes_{v}v',        data=np.asarray(pulse_shapes),        dtype=np.float64)
                 g.create_dataset(f'pulse_indices_in_win_{v}v',data=np.asarray(pulse_indices_in_win),dtype=np.int32)
+                
+            ###next 2 lines are new to save the peak indicies and peak time away from trigger into the output file
+                g.create_dataset(f'peak_indices_in_win_{v}v', data=np.asarray(peak_indices_in_win), dtype=np.int32)
+                g.create_dataset(f'peak_times_from_trigger_us_{v}v', data=np.asarray(peak_times_from_trigger_us), dtype=np.float64)
+
                 g.create_dataset(f'z_signal_{v}v',            data=np.asarray(zz_pulses),           dtype=np.float64)
                 g.create_dataset(f'drive_area_{v}v',          data=np.asarray(drive_areas),         dtype=np.float64)
                 g.create_dataset(f'f_res_{v}v',               data=np.asarray(fs_res),              dtype=np.float64)
