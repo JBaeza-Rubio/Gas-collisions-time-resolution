@@ -373,7 +373,7 @@ def get_search_window(amp, pulse_idx_in_window, search_window_length, pulse_leng
 
     search_window[left:right] = True
     return search_window
-
+#####-----------------------------------------------------------------
 def recon_pulse(idx, dtt, zz_bp, dd,
                 c_imp=None,
                 gamma_damping=None,
@@ -386,7 +386,7 @@ def recon_pulse(idx, dtt, zz_bp, dd,
 
     if idx < prepulse_window_length:
         print('Skipping pulse too close to the beginning of the file')
-        return None, None, None, np.nan
+        return None, None, None, np.nan, np.nan, np.nan
 
     fs = int(np.ceil(1 / dtt))
 
@@ -414,11 +414,28 @@ def recon_pulse(idx, dtt, zz_bp, dd,
     amp_lp = lowpass_filtered(amp, fs, lowpass_freq, lowpass_order)
 
     # Search the absolute value because homodyne could lock differently from time to time
+    ###search_window = get_search_window(amp, pulse_idx_in_window, search_window_length, pulse_length)
+    ###recon_amp = np.max(np.abs(amp_lp[search_window])/1e9) ### recon_amp finds maximum amplitude for each impulse
+    ###return window, amp/1e9, amp_lp/1e9, recon_amp
+
+####below is new from jbr. Recon_amp still gives me the max amp, 
+#### peak_idx_in_window should tell me where the peak occurs
+#### peak_time_from_trigger_us should tell me how far the peak happens after the trigger in microseconds
     search_window = get_search_window(amp, pulse_idx_in_window, search_window_length, pulse_length)
-    recon_amp = np.max(np.abs(amp_lp[search_window])/1e9)
 
-    return window, amp/1e9, amp_lp/1e9, recon_amp
+    if search_window is None:
+        return window, amp/1e9, amp_lp/1e9, np.nan, np.nan, np.nan
 
+    search_indices = np.flatnonzero(search_window)
+    local_peak_idx = np.argmax(np.abs(amp_lp[search_window]))
+    peak_idx_in_window = search_indices[local_peak_idx]
+
+    recon_amp = np.abs(amp_lp[peak_idx_in_window]) / 1e9
+    peak_time_from_trigger_us = (peak_idx_in_window - pulse_idx_in_window) * dtt * 1e6
+
+    return window, amp/1e9, amp_lp/1e9, recon_amp, peak_idx_in_window, peak_time_from_trigger_us
+    
+###-------------------------------------------------------------
 # def fit_amps_gaus(normalized_amps, bins=None, noise=False, return_bins=False):
 #     hhs, bcs, gps = [], [], [] ##gp must be gaussian parameters
 #     bins_ret = []
