@@ -427,7 +427,23 @@ def recon_pulse(idx, dtt, zz_bp, dd,
         return window, amp/1e9, amp_lp/1e9, np.nan, np.nan, np.nan
 
     search_indices = np.flatnonzero(search_window)
-    local_peak_idx = np.argmax(np.abs(amp_lp[search_window]))
+    ###local_peak_idx = np.argmax(np.abs(amp_lp[search_window])) ###ganna try to get rid of sidelobes by changing window to pass a threshold
+
+    search_indices = np.flatnonzero(search_window)
+
+    vals = np.abs(amp_lp[search_window])
+    threshold = 0.7 * np.max(vals)
+
+    candidates = np.where(vals > threshold)[0]
+
+    if len(candidates) == 0:
+        # fallback: use original argmax if something weird happens
+        local_peak_idx = np.argmax(vals)
+    else:
+        # pick earliest peak above threshold
+        local_peak_idx = candidates[0]
+
+
     peak_idx_in_window = search_indices[local_peak_idx]
 
     recon_amp = np.abs(amp_lp[peak_idx_in_window]) / 1e9
