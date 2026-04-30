@@ -93,9 +93,10 @@ def get_pulse_shape(zz_bp_in_window, f_lp, amp, length=1500, is_scaled=False):
 
     return zz_ret, ret, pulse_idx_in_win
 
-def get_drive_area(idx, window_length, zz, dd, dtt, drive_freq):
+def get_drive_area(idx, window_length, zz, dd, dtt, drive_freq): ###dtt = 200 ns is the sample interval 
     window     = utils.get_prepulse_window(dd, idx, window_length)
     zz_windowed = zz[window]
+   
 
     ff, pp     = utils.get_psd(dt=dtt, zz=zz_windowed, nperseg=2**16)
     noise_idx  = np.logical_and(ff > 150000, ff < 175000)

@@ -379,7 +379,7 @@ def recon_pulse(idx, dtt, zz_bp, dd,
                 gamma_damping=None,
                 analysis_window_length=100000,
                 prepulse_window_length=5000,
-                search_window_length=20,###i believe these are in nanoseconds
+                search_window_length=20,### these are 20 indicies, not seconds
                 pulse_length=20,
                 lowpass_freq=60000,
                 lowpass_order=3):
